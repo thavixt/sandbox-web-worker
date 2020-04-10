@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "target": "ES2017",
+        "module": "ES6",
+        "moduleResolution": "node",
+        "sourceMap": true,
+        "lib": [
+            "dom",
+            "ES2017",
+        ],
+        "noImplicitAny": true,
+        "removeComments": true,
+    },
+    "include": [
+        "src/sandbox.ts",
+        "example/api.ts",
+        "example/index.ts",
+    ],
+}

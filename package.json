@@ -1,0 +1,28 @@
+{
+  "name": "sandbox-with-webworker",
+  "version": "1.0.0",
+  "description": "Sandbox sensitive or heavy tasks in Web Worker threads",
+  "author": "thavixt",
+  "license": "ISC",
+  "keywords": [
+    "web",
+    "worker",
+    "sandbox",
+    "webworker",
+    "thread",
+    "task"
+  ],
+  "main": "index.js",
+  "directories": {
+    "example": "example",
+    "src": "src"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "typescript": "^3.8.3"
+  }
+}
