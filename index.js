@@ -28,6 +28,12 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
         debug: myLogger,
     });
     await sb.start();
+    for (let i = 0; i < 10; i++) {
+        const delay = Math.round(Math.random() * 5000);
+        setTimeout(() => {
+            sb.call('addNumbersDelayed', [1, i]);
+        }, delay);
+    }
     sb.call('mySandboxFunction', ['hello', 'world'], (result) => {
         console.log('callback', result);
     });
