@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "gh-pages": "npm run build && cp src/sandbox.js example/sandbox.js && sed -i 's/\\.\\.\\/src\\/sandbox\\.js/\\.\\/sandbox\\.js/g' example/index.js && gh-pages -d example && git checkout -- .",
+    "gh-pages": "npm run build && cp src/sandbox.js example/sandbox.js && sed -i 's/\\.\\.\\/src\\/sandbox\\.js/\\.\\/sandbox\\.js/g' example/index.js && gh-pages -d example && git clean -df && git checkout -- .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
