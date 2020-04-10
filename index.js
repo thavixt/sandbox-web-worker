@@ -1,4 +1,4 @@
-import Sandbox from '../src/sandbox.js';
+import Sandbox from './sandbox.js';
 import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
 (async () => {
     const taskCounter = document.getElementById('taskCounter');
