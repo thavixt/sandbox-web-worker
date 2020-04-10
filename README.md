@@ -8,3 +8,7 @@
     - dynamic promise-based task counter
 - handles async code in Sandbox/Web Worker
 - waits for all tasks to complete before terminating/destroying
+
+## Example
+
+https://thavixt.github.io/sandbox-web-worker/
