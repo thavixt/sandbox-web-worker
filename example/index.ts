@@ -45,12 +45,12 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
     await sb.start();
 
     // Simulate user interaction with some function calls
-    // for (let i = 0; i < 10; i++) {
-    //     const delay = Math.round(Math.random() * 5000);
-    //     setTimeout(() => {
-    //         sb.call('addNumbersDelayed', [1, i]);
-    //     }, delay);
-    // }
+    for (let i = 0; i < 10; i++) {
+        const delay = Math.round(Math.random() * 5000);
+        setTimeout(() => {
+            sb.call('addNumbersDelayed', [1, i]);
+        }, delay);
+    }
 
     // sb.call('addNumbersDelayed', [1, 0]);
     // sb.call('addNumbersDelayed', [1, 1]);
