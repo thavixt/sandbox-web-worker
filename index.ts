@@ -2,13 +2,10 @@ import Sandbox from '../src/sandbox.js';
 import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
 
 (async () => {
-    // TODO: remove. Used for logging to the DOM
-    const taskCounter = document.getElementById('taskCounter');
-
     // Get arbitrary user code from external source
     const userCodeText = await fetch('./userCode.js').then(js => js.text());
 
-    // Set up a logger function
+    // Set up a debug logger function
     const logElement = document.getElementById('log');
     function myLogger(msg: string) {
         const started = msg.match('TASK START');
@@ -25,7 +22,8 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
         logElement.appendChild(p);
         logElement.scrollTop = logElement.scrollHeight;
     }
-
+    // Used for logging the current task count to the DOM
+    const taskCounter = document.getElementById('taskCounter');
 
     // Create a new Sandbox Worker thread
     const sb = new Sandbox({
@@ -45,18 +43,13 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
     await sb.start();
 
     // Simulate user interaction with some function calls
+    // These will resolve aftera a random time emulating an async task
     for (let i = 0; i < 10; i++) {
         const delay = Math.round(Math.random() * 5000);
         setTimeout(() => {
             sb.call('addNumbersDelayed', [1, i]);
         }, delay);
     }
-
-    // sb.call('addNumbersDelayed', [1, 0]);
-    // sb.call('addNumbersDelayed', [1, 1]);
-    // sb.call('addNumbersDelayed', [1, 2]);
-    // sb.call('addNumbersDelayed', [1, 4]);
-    // sb.call('addNumbersDelayed', [1, 5]);
 
     // Callback function example
     sb.call('mySandboxFunction', ['hello', 'world'], (result) => {
@@ -73,7 +66,7 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
 
     // Terminate manually
     // Use if the argument 'autoTerminateAfterMs' is not given
-    // await sb.terminate(false);
+    // await sb.terminate(false); // don't wait for running tasks to finish
     // await sb.terminate();
 
     // Losing the instance reference is safe now, the worker thread is deleted

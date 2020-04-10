@@ -1,7 +1,6 @@
 import Sandbox from './sandbox.js';
 import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
 (async () => {
-    const taskCounter = document.getElementById('taskCounter');
     const userCodeText = await fetch('./userCode.js').then(js => js.text());
     const logElement = document.getElementById('log');
     function myLogger(msg) {
@@ -16,6 +15,7 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
         logElement.appendChild(p);
         logElement.scrollTop = logElement.scrollHeight;
     }
+    const taskCounter = document.getElementById('taskCounter');
     const sb = new Sandbox({
         name: 'MySandbox01',
         api: {
