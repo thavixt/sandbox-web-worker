@@ -12,3 +12,11 @@
 ## Example
 
 https://thavixt.github.io/sandbox-web-worker/
+
+## TODO
+
+- [ ] fix source map url in example/sandbox.js
+- [ ] fix debug log datetime format
+- [ ] testing ?
+- [ ] extend default Sandbox API
+- [ ] clean up code
