@@ -1,17 +1,12 @@
 ;
 const DEFAULT_API_HANDLERS = {
-    setName: () => { },
     start: (runningTime) => {
-        console.info(`Sandbox.main code ran in ${runningTime}ms.`);
+        console.info(`Sandbox.main finished in ${runningTime}ms.`);
     }
 };
-const DEFAULT_SANDBOX_API = () => {
+const DEFAULT_SANDBOX_API = (name) => {
     const worker = self;
     const sandbox = self.$;
-    sandbox.setName = ({ name }, taskId) => {
-        sandbox.name = name;
-        worker.postMessage({ action: 'setName', payload: name, taskId });
-    };
     sandbox.start = async (payload, taskId) => {
         if (sandbox.main) {
             const startTime = Date.now();
@@ -23,7 +18,7 @@ const DEFAULT_SANDBOX_API = () => {
             });
         }
         else {
-            throw new Error(`Function main() is undefined in the ${self.name} Worker namespace.`);
+            throw new Error(`Function 'main' is undefined in the ${name} Sandbox namespace.`);
         }
     };
     worker.onmessage = (message) => {
@@ -32,12 +27,21 @@ const DEFAULT_SANDBOX_API = () => {
             sandbox[action](payload, taskId);
         }
         else {
-            throw new Error(`Function ${action} is undefined in the ${self.name} Worker namespace.`);
+            throw new Error(`Function '${action}' is undefined in the ${name} Sandbox namespace.`);
         }
     };
-    Object.defineProperty(self, "setName", { configurable: false, writable: false });
-    Object.defineProperty(self, "start", { configurable: false, writable: false });
-    Object.defineProperty(self, "onmessage", { configurable: false, writable: false });
+    Object.defineProperty(worker, "onmessage", { configurable: false, writable: false });
+    Object.defineProperty(worker, "postMessage", { configurable: false, writable: false });
+};
+const FREEZE_API = ($scope) => {
+    Object.keys($scope)
+        .filter(key => key !== 'main')
+        .forEach(key => {
+        Object.defineProperty($scope, key, {
+            configurable: false,
+            writable: false,
+        });
+    });
 };
 class Sandbox {
     constructor({ name, code = '', api = { public: () => { }, handlers: {} }, onTaskCountChange = function () { }, autoTerminateAfterMs = -1, debug = null }) {
@@ -96,8 +100,8 @@ class Sandbox {
                 }
             };
             this.thread.onerror = (e) => {
+                console.error(`Sandbox error (${this.name})`, e);
             };
-            await this.call('setName', { name: this.name });
             await this.call('start');
         };
         this.call = async (action, payload, callback) => {
@@ -165,22 +169,26 @@ class Sandbox {
         this.name = `Sandbox#${name}`;
         this.blobURL = createBlobURL([
             `'use strict';\n`,
-            `self.$={};\n`,
-            `(${DEFAULT_SANDBOX_API.toString()})();\n`,
-            `(${(api.public || {}).toString()})($);\n`,
-            `$.main=async()=>{${code.toString()}};`,
+            minify(`self.$={};`),
+            minify(`(${DEFAULT_SANDBOX_API.toString()})('${this.name}');`),
+            minify(`(${(api.public || {}).toString()})($);`),
+            minify(`(${FREEZE_API})(self.$);`),
+            `$.main=async()=>{{${code.toString()}}Object.freeze(self.$);};`,
         ]);
         this.handlers = Object.assign(DEFAULT_API_HANDLERS, api.handlers || {});
         this.onTaskCountChange = onTaskCountChange;
     }
     log(message) {
         if (this.debug) {
-            this.debug(message);
+            this.debug((new Date()).getTime(), this.name, message);
         }
     }
 }
 function createBlobURL(blobParts) {
     return URL.createObjectURL(new Blob(blobParts));
+}
+function minify(text) {
+    return text.replace(/  /g, '').replace(/(\r\n|\n|\r)/gm, '');
 }
 function getRandomId() {
     return Math.random().toString(36).substr(2, 9);
