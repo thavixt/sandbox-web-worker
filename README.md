@@ -16,7 +16,7 @@ const mySandbox = new Sandbox({
     },
     onTaskCountChange?: (message: string) => void,
     autoTerminateAfterMs?: number,
-    debug?: (count: number) => void,
+    debug?: (timestamp: number, sandboxName: string, message: string) => void,
 })
 ```
 
@@ -169,7 +169,11 @@ const mySandbox = Sandbox({
 });
 ```
 
-User code example
+This user code can access the provided Public API throught the `$` (dollar sign) object.
+
+The `$` object and all it's properties are frozen (with `Object.freeze` and `Object.defineProperty`) when creating a new Sandbox instance and upon calling `start`. Attempting to modify the `self.$`/`$` object in the user code will have no effect.
+
+User code example:
 
 ```js
 // userCode.js
@@ -200,10 +204,11 @@ You can inspect the Web Worker's code from the dev tools to see it's structure.
 To terminate (destroy) the Sandbox thread, call it's `terminate` method:
 
 ```ts
-mySandbox.terminate(waitForRunningTasks: boolean);
+mySandbox.terminate(waitForRunningTasks = false);
 ```
 
 Calling it with a `true` argument will destroy the thread immediately, leaving all running tasks/code unfinished. Use with caution!
+By default, the Sandbox will wait for all currently running tasks to finish before destroying the thread.
 
 To terminate the thread automatically after x milliseconds of inactivity, use the `autoTerminateAfterMs` constructor parameter:
 
@@ -223,8 +228,10 @@ A (different) live example: https://thavixt.github.io/sandbox-web-worker/
 
 ## TODO
 
+- [x] example in README
+- [x] some documentation
 - [ ] fix source map url in example/sandbox.js
-- [ ] fix debug log datetime format
+- [x] fix debug log datetime format
 - [ ] testing ?
 - [ ] extend default Sandbox API
 - [ ] clean up code

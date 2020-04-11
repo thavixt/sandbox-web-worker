@@ -27,7 +27,7 @@ interface SandboxArguments {
     debug?: LoggerFunction,
 }
 
-type LoggerFunction = (message: string) => void;
+type LoggerFunction = (timestamp: number, sandboxName: string, message: string) => void;
 type TaskCountChangeCallback = (count: number) => void;
 
 interface Task<T = any> {
@@ -46,21 +46,16 @@ interface TaskParams {
 }
 
 const DEFAULT_API_HANDLERS = {
-    setName: () => { },
     start: (runningTime: number) => {
-        console.info(`Sandbox.main code ran in ${runningTime}ms.`);
+        console.info(`Sandbox.main finished in ${runningTime}ms.`);
     }
 };
 
 
-const DEFAULT_SANDBOX_API = () => {
+const DEFAULT_SANDBOX_API = (name: string) => {
     const worker: WorkerScope = self as any;
     const sandbox: SandboxScope = (self as unknown as WorkerScope).$;
 
-    sandbox.setName = ({ name }, taskId) => {
-        sandbox.name = name;
-        worker.postMessage({ action: 'setName', payload: name, taskId });
-    };
     sandbox.start = async (payload, taskId) => {
         if (sandbox.main) {
             const startTime = Date.now();
@@ -71,7 +66,7 @@ const DEFAULT_SANDBOX_API = () => {
                 taskId,
             });
         } else {
-            throw new Error(`Function main() is undefined in the ${self.name} Worker namespace.`);
+            throw new Error(`Function 'main' is undefined in the ${name} Sandbox namespace.`);
         }
     };
     worker.onmessage = (message) => {
@@ -79,14 +74,24 @@ const DEFAULT_SANDBOX_API = () => {
         if (sandbox[action]) {
             sandbox[action](payload, taskId);
         } else {
-            throw new Error(`Function ${action} is undefined in the ${self.name} Worker namespace.`)
+            throw new Error(`Function '${action}' is undefined in the ${name} Sandbox namespace.`)
         }
     };
 
-    Object.defineProperty(self, "setName", { configurable: false, writable: false });
-    Object.defineProperty(self, "start", { configurable: false, writable: false });
-    Object.defineProperty(self, "onmessage", { configurable: false, writable: false });
+    Object.defineProperty(worker, "onmessage", { configurable: false, writable: false });
+    Object.defineProperty(worker, "postMessage", { configurable: false, writable: false });
 };
+
+const FREEZE_API = ($scope: SandboxScope) => {
+    Object.keys($scope)
+        .filter(key => key !== 'main')
+        .forEach(key => {
+            Object.defineProperty($scope, key, {
+                configurable: false,
+                writable: false,
+            });
+        });
+}
 
 class Sandbox {
     autoTerminateAfterMs: number | null = null;
@@ -119,10 +124,11 @@ class Sandbox {
         this.name = `Sandbox#${name}`
         this.blobURL = createBlobURL([
             `'use strict';\n`,
-            `self.$={};\n`,
-            `(${DEFAULT_SANDBOX_API.toString()})();\n`,
-            `(${(api.public || {}).toString()})($);\n`,
-            `$.main=async()=>{${code.toString()}};`,
+            minify(`self.$={};`),
+            minify(`(${DEFAULT_SANDBOX_API.toString()})('${this.name}');`),
+            minify(`(${(api.public || {}).toString()})($);`),
+            minify(`(${FREEZE_API})(self.$);`),
+            `$.main=async()=>{{${code.toString()}}Object.freeze(self.$);};`,
         ]);
         this.handlers = Object.assign(DEFAULT_API_HANDLERS, api.handlers || {});
         this.onTaskCountChange = onTaskCountChange;
@@ -183,10 +189,9 @@ class Sandbox {
         }
 
         this.thread.onerror = (e) => {
-            // console.error(`There was an error in ${this.name}`, e);
+            console.error(`Sandbox error (${this.name})`, e);
         }
 
-        await this.call('setName', { name: this.name });
         await this.call('start');
     }
 
@@ -266,13 +271,17 @@ class Sandbox {
 
     private log(message: string) {
         if (this.debug) {
-            this.debug(message);
+            this.debug((new Date()).getTime(), this.name, message);
         }
     }
 }
 
 function createBlobURL(blobParts: string[]) {
     return URL.createObjectURL(new Blob(blobParts));
+}
+
+function minify(text: string) {
+    return text.replace(/  /g, '').replace(/(\r\n|\n|\r)/gm, '');
 }
 
 function getRandomId() {

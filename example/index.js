@@ -1,21 +1,9 @@
 import Sandbox from '../src/sandbox.js';
 import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
 (async () => {
-    const taskCounter = document.getElementById('taskCounter');
     const userCodeText = await fetch('./userCode.js').then(js => js.text());
     const logElement = document.getElementById('log');
-    function myLogger(msg) {
-        const started = msg.match('TASK START');
-        const finished = msg.match('TASK FINISH');
-        const p = document.createElement('p');
-        p.textContent = `${(new Date()).getTime()} - ${msg} `;
-        const cls = started ? 'started' : (finished ? 'finished' : null);
-        if (cls) {
-            p.classList.add(cls);
-        }
-        logElement.appendChild(p);
-        logElement.scrollTop = logElement.scrollHeight;
-    }
+    const taskCounter = document.getElementById('taskCounter');
     const sb = new Sandbox({
         name: 'MySandbox01',
         api: {
@@ -24,11 +12,22 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
         },
         code: userCodeText,
         onTaskCountChange: (taskCount) => taskCounter.textContent = taskCount.toString(),
-        autoTerminateAfterMs: 1000,
-        debug: myLogger,
+        autoTerminateAfterMs: 3000,
+        debug: (time, sandbox, msg) => {
+            const started = msg.match('TASK START');
+            const finished = msg.match('TASK FINISH');
+            const p = document.createElement('p');
+            p.textContent = `${time} - ${sandbox} - ${msg}`;
+            const cls = started ? 'started' : (finished ? 'finished' : null);
+            if (cls) {
+                p.classList.add(cls);
+            }
+            logElement.appendChild(p);
+            logElement.scrollTop = logElement.scrollHeight;
+        },
     });
     await sb.start();
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
         const delay = Math.round(Math.random() * 5000);
         setTimeout(() => {
             sb.call('addNumbersDelayed', [1, i]);

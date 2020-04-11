@@ -5,23 +5,8 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
     // Get arbitrary user code from external source
     const userCodeText = await fetch('./userCode.js').then(js => js.text());
 
-    // Set up a debug logger function
+    // Used for debug logger function
     const logElement = document.getElementById('log');
-    function myLogger(msg: string) {
-        const started = msg.match('TASK START');
-        const finished = msg.match('TASK FINISH');
-
-        const p = document.createElement('p');
-        p.textContent = `${(new Date()).getTime()} - ${msg} `;
-
-        const cls = started ? 'started' : (finished ? 'finished' : null);
-        if (cls) {
-            p.classList.add(cls);
-        }
-
-        logElement.appendChild(p);
-        logElement.scrollTop = logElement.scrollHeight;
-    }
     // Used for logging the current task count to the DOM
     const taskCounter = document.getElementById('taskCounter');
 
@@ -34,8 +19,19 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
         },
         code: userCodeText,
         onTaskCountChange: (taskCount) => taskCounter.textContent = taskCount.toString(),
-        autoTerminateAfterMs: 1000,
-        debug: myLogger, // could also use the native console.log
+        autoTerminateAfterMs: 3000,
+        debug: (time, sandbox, msg) => {
+            const started = msg.match('TASK START');
+            const finished = msg.match('TASK FINISH');
+            const p = document.createElement('p');
+            p.textContent = `${time} - ${sandbox} - ${msg}`;
+            const cls = started ? 'started' : (finished ? 'finished' : null);
+            if (cls) {
+                p.classList.add(cls);
+            }
+            logElement.appendChild(p);
+            logElement.scrollTop = logElement.scrollHeight;
+        }, // could also use the native console.log
     });
 
     // Wait for thread creation, API setup etc
@@ -44,7 +40,7 @@ import { SANDBOX_API, SANDBOX_API_RESPONSE_HANDLERS } from './api.js';
 
     // Simulate user interaction with some function calls
     // These will resolve aftera a random time emulating an async task
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
         const delay = Math.round(Math.random() * 5000);
         setTimeout(() => {
             sb.call('addNumbersDelayed', [1, i]);
