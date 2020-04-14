@@ -1,4 +1,4 @@
-import { SandboxScope, WorkerScope } from '../src/sandbox';
+import { SandboxScope, SignalApiResponse } from '../src/sandbox';
 
 export const SANDBOX_API_RESPONSE_HANDLERS = {
     mySandboxFunction: (result: any) => {
@@ -12,20 +12,19 @@ export const SANDBOX_API_RESPONSE_HANDLERS = {
     },
 };
 
-export const SANDBOX_API = function ($scope: SandboxScope) {
-    const postMessage = (self as unknown as WorkerScope).postMessage;
+export const SANDBOX_API = function ($scope: SandboxScope, signalResult: SignalApiResponse) {
     $scope.mySandboxFunction = (args, taskId) => {
-        postMessage({ action: 'mySandboxFunction', payload: JSON.stringify(args), taskId });
+        signalResult({ action: 'mySandboxFunction', payload: JSON.stringify(args), taskId });
     }
     $scope.addNumbers = (args: number[], taskId) => {
         const result = args.reduce((prev, curr) => prev + curr, 0);
-        postMessage({ action: 'addNumbers', payload: result, taskId });
+        signalResult({ action: 'addNumbers', payload: result, taskId });
     }
     $scope.addNumbersDelayed = (args: number[], taskId) => {
         const result = args.reduce((prev, curr) => prev + curr, 0);
         const delay = Math.round(Math.random() * 3000);
         self.setTimeout(() => {
-            postMessage({ action: 'addNumbersDelayed', payload: result, taskId });
+            signalResult({ action: 'addNumbersDelayed', payload: result, taskId });
         }, delay);
     }
 };
