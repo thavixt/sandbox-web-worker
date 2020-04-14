@@ -104,7 +104,9 @@ Let's say you want to be able to pass data between your app and the Sandbox. Thi
 Lets create a Public API for it:
 
 ```ts
-const MY_PUBLIC_API = ($scope: SandboxScope) => {
+import {SandboxScope, SignalApiResult} from 'sandbox';
+
+const MY_PUBLIC_API = ($scope: SandboxScope, signalResult: SignalApiResult) => {
     // ...
     $scope.postSum = (numbers: number[]) {
         const sum = $scope.calculateSum(numbers);
@@ -112,6 +114,8 @@ const MY_PUBLIC_API = ($scope: SandboxScope) => {
     }
 };
 ```
+
+> Note: The `signalResult` argument is a function that will signal the result to the corresponding API handler method using the worker's `postMessage` method.
 
 Create the API callback handler object:
 
@@ -232,6 +236,8 @@ A (different) live example: https://thavixt.github.io/sandbox-web-worker/
 - [x] some documentation
 - [ ] fix source map url in example/sandbox.js
 - [x] fix debug log datetime format
-- [ ] testing ?
-- [ ] extend default Sandbox API
+- [ ] ability to disable native function on the worker scope (not the sandbox ($) scope)
+- [ ] extend default Sandbox API with common useful methods
+- [ ] rename Sandbox scope ($) object ?
 - [ ] clean up code
+- [ ] testing ?

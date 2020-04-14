@@ -1,9 +1,4 @@
 ;
-const DEFAULT_API_HANDLERS = {
-    start: (runningTime) => {
-        console.info(`Sandbox.main finished in ${runningTime}ms.`);
-    }
-};
 const DEFAULT_SANDBOX_API = (name) => {
     const worker = self;
     const sandbox = self.$;
@@ -55,7 +50,7 @@ class Sandbox {
         this.onTaskCountChange = null;
         this.start = async () => {
             if (this.thread) {
-                console.warn(`${this.name} was already started and is running.`);
+                console.warn(`${this.name} is already started and is running.`);
                 return;
             }
             this.thread = new Worker(this.blobURL);
@@ -65,17 +60,17 @@ class Sandbox {
             this.thread.onmessage = (message) => {
                 const { taskId, action, payload = null } = message.data;
                 if (this.debug) {
-                    this.log(`TASK FINISHED: ${JSON.stringify(message.data)} `);
+                    this.log(`TASK FINISHED: '${action}'`, message.data);
                 }
                 if (this.handlers.hasOwnProperty(action)) {
                     if (!taskId) {
-                        console.info(`No taskId for current message. (method: ${action}) - probably called from sandbox code.`);
+                        this.log(`No taskId for current message. (method: ${action}) - probably called from sandbox code.`);
                         this.handlers[action](payload);
                         return;
                     }
                     const task = this.runningTasks.get(taskId);
                     if (!task) {
-                        console.warn(`Task #${taskId} not found. (method: ${action})`);
+                        this.log(`Task #${taskId} not found. (method: ${action})`);
                     }
                     else {
                         task.promise.resolve(payload);
@@ -96,11 +91,12 @@ class Sandbox {
                     }
                 }
                 else {
-                    console.warn(`Unrecognized action '${action} finished from ${this.name}`, message.data);
+                    this.log(`Unrecognized action '${action} finished from ${this.name}`, message.data);
                 }
             };
             this.thread.onerror = (e) => {
-                console.error(`Sandbox error (${this.name})`, e);
+                this.log(`Sandbox error (${this.name})`);
+                throw e;
             };
             await this.call('start');
         };
@@ -110,7 +106,7 @@ class Sandbox {
                 return Promise.reject(`${this.name} is not started yet. Call <SandboxObject>.start() first.`);
             }
             if (this.markedForTermination) {
-                console.warn(`${this.name} is marked for termination and cannot post new messages. Waiting until all tasks finish and terminating Sandbox ...`);
+                this.log(`${this.name} is marked for termination and cannot post new messages. Waiting until all tasks finish and terminating Sandbox ...`);
             }
             if (this.autoTerminationTimerId) {
                 clearInterval(this.autoTerminationTimerId);
@@ -129,7 +125,7 @@ class Sandbox {
                 callback,
             });
             if (this.debug) {
-                this.log(`TASK STARTED: ${JSON.stringify({ action, payload, taskId })}`);
+                this.log(`TASK STARTED: '${action}'`, { action, payload, taskId });
             }
             this.thread.postMessage({ action, payload, taskId });
             this.onTaskCountChange(this.runningTasks.size);
@@ -154,7 +150,7 @@ class Sandbox {
             this.thread = null;
             this.markedForTermination = false;
             if (!waitForTasksToFinish) {
-                console.warn(`${this.name} terminated forcefully. ${taskCount} tasks were abandoned.`);
+                this.log(`${this.name} terminated forcefully. ${taskCount} tasks were abandoned.`);
             }
             if (this.debug) {
                 this.log(`SANDBOX TERMINATED.`);
@@ -171,16 +167,20 @@ class Sandbox {
             `'use strict';\n`,
             minify(`self.$={};`),
             minify(`(${DEFAULT_SANDBOX_API.toString()})('${this.name}');`),
-            minify(`(${(api.public || {}).toString()})($);`),
+            minify(`(${(api.public || {}).toString()})($, self.postMessage);`),
             minify(`(${FREEZE_API})(self.$);`),
             `$.main=async()=>{{${code.toString()}}Object.freeze(self.$);};`,
         ]);
-        this.handlers = Object.assign(DEFAULT_API_HANDLERS, api.handlers || {});
+        this.handlers = Object.assign({
+            start: (runningTime) => {
+                this.log(`User code IIFE finished in ${runningTime}ms.`);
+            }
+        }, api.handlers || {});
         this.onTaskCountChange = onTaskCountChange;
     }
-    log(message) {
+    log(message, task) {
         if (this.debug) {
-            this.debug((new Date()).getTime(), this.name, message);
+            this.debug((new Date()).getTime(), this.name, message, task);
         }
     }
 }

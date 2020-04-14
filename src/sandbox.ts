@@ -1,34 +1,20 @@
-export interface SandboxScope {
-    main: () => Promise<void>;
-    [key: string]: (payload: any, taskId: string) => void | Promise<void>;
-};
-
-export interface WorkerScope extends WindowOrWorkerGlobalScope {
-    $: SandboxScope;
-    onmessage: (message: { data: TaskParams }) => void;
-    postMessage(message: TaskParams): void;
-}
-
 interface SandboxArguments {
     name: string,
     code?: string,
     api?: {
-        // sets up public functions that can be called from user scope ($scope.<func>(args))
-        // {
-        //     [key: string]: () => any | Promise<any>
-        // }
-        public: (scope: SandboxScope) => void,
+        public: (scope: SandboxScope, signalResult: SignalApiResponse) => void | Promise<void>,
         handlers: {
-            [key: string]: (result: any) => any
+            [key: string]: (result: any) => any,
         },
     },
     onTaskCountChange?: TaskCountChangeCallback,
     autoTerminateAfterMs?: number,
     debug?: LoggerFunction,
 }
-
-type LoggerFunction = (timestamp: number, sandboxName: string, message: string) => void;
-type TaskCountChangeCallback = (count: number) => void;
+export interface SandboxScope {
+    main: () => Promise<void>;
+    [key: string]: (payload: any, taskId: string) => void | Promise<void>;
+};
 
 interface Task<T = any> {
     _promiseObj: Promise<T>,
@@ -39,18 +25,23 @@ interface Task<T = any> {
     callback?: (result: T) => void,
 }
 
-interface TaskParams {
+export interface TaskParams {
     action: string,
     payload?: any,
     taskId?: string
 }
 
-const DEFAULT_API_HANDLERS = {
-    start: (runningTime: number) => {
-        console.info(`Sandbox.main finished in ${runningTime}ms.`);
-    }
-};
+export interface WorkerScope extends WindowOrWorkerGlobalScope {
+    $: SandboxScope;
+    onmessage: (message: { data: TaskParams }) => void;
+    postMessage(message: TaskParams): void;
+}
 
+type LoggerFunction = (timestamp: number, sandboxName: string, message: string, task?: TaskParams) => void;
+
+export type SignalApiResponse = ({ action, payload, taskId }: TaskParams) => void;
+
+type TaskCountChangeCallback = (count: number) => void;
 
 const DEFAULT_SANDBOX_API = (name: string) => {
     const worker: WorkerScope = self as any;
@@ -126,17 +117,21 @@ class Sandbox {
             `'use strict';\n`,
             minify(`self.$={};`),
             minify(`(${DEFAULT_SANDBOX_API.toString()})('${this.name}');`),
-            minify(`(${(api.public || {}).toString()})($);`),
+            minify(`(${(api.public || {}).toString()})($, self.postMessage);`),
             minify(`(${FREEZE_API})(self.$);`),
             `$.main=async()=>{{${code.toString()}}Object.freeze(self.$);};`,
         ]);
-        this.handlers = Object.assign(DEFAULT_API_HANDLERS, api.handlers || {});
+        this.handlers = Object.assign({
+            start: (runningTime: number) => {
+                this.log(`User code IIFE finished in ${runningTime}ms.`);
+            }
+        }, api.handlers || {});
         this.onTaskCountChange = onTaskCountChange;
     }
 
     public start = async () => {
         if (this.thread) {
-            console.warn(`${this.name} was already started and is running.`);
+            console.warn(`${this.name} is already started and is running.`);
             return;
         }
 
@@ -150,19 +145,19 @@ class Sandbox {
             const { taskId, action, payload = null } = message.data;
 
             if (this.debug) {
-                this.log(`TASK FINISHED: ${JSON.stringify(message.data)} `);
+                this.log(`TASK FINISHED: '${action}'`, message.data);
             }
 
             if (this.handlers.hasOwnProperty(action)) {
                 if (!taskId) {
-                    console.info(`No taskId for current message. (method: ${action}) - probably called from sandbox code.`);
+                    this.log(`No taskId for current message. (method: ${action}) - probably called from sandbox code.`);
                     this.handlers[action](payload);
                     return;
                 }
 
                 const task = this.runningTasks.get(taskId);
                 if (!task) {
-                    console.warn(`Task #${taskId} not found. (method: ${action})`);
+                    this.log(`Task #${taskId} not found. (method: ${action})`);
                 } else {
                     task.promise.resolve(payload);
                     if (task.callback) {
@@ -184,12 +179,13 @@ class Sandbox {
                 }
 
             } else {
-                console.warn(`Unrecognized action '${action} finished from ${this.name}`, message.data);
+                this.log(`Unrecognized action '${action} finished from ${this.name}`, message.data);
             }
         }
 
         this.thread.onerror = (e) => {
-            console.error(`Sandbox error (${this.name})`, e);
+            this.log(`Sandbox error (${this.name})`);
+            throw e;
         }
 
         await this.call('start');
@@ -203,7 +199,7 @@ class Sandbox {
         }
 
         if (this.markedForTermination) {
-            console.warn(`${this.name} is marked for termination and cannot post new messages. Waiting until all tasks finish and terminating Sandbox ...`);
+            this.log(`${this.name} is marked for termination and cannot post new messages. Waiting until all tasks finish and terminating Sandbox ...`);
         }
 
         if (this.autoTerminationTimerId) {
@@ -226,7 +222,7 @@ class Sandbox {
         });
 
         if (this.debug) {
-            this.log(`TASK STARTED: ${JSON.stringify({ action, payload, taskId })}`);
+            this.log(`TASK STARTED: '${action}'`, { action, payload, taskId });
         }
 
         this.thread.postMessage({ action, payload, taskId });
@@ -259,7 +255,7 @@ class Sandbox {
         this.markedForTermination = false;
 
         if (!waitForTasksToFinish) {
-            console.warn(`${this.name} terminated forcefully. ${taskCount} tasks were abandoned.`);
+            this.log(`${this.name} terminated forcefully. ${taskCount} tasks were abandoned.`);
         }
 
         if (this.debug) {
@@ -269,9 +265,9 @@ class Sandbox {
         return;
     }
 
-    private log(message: string) {
+    private log(message: string, task?: TaskParams) {
         if (this.debug) {
-            this.debug((new Date()).getTime(), this.name, message);
+            this.debug((new Date()).getTime(), this.name, message, task);
         }
     }
 }
