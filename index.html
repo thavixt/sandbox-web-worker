@@ -12,34 +12,36 @@
                 font-size: 14px;
             }
 
+            pre {
+                margin-top: 0;
+            }
             #log {
                 display: block;
-                height: 30em;
+                height: 70vh;
                 overflow: auto;
-                padding: 2em 1em;
                 background: ghostwhite;
             }
-
             #log>p {
                 margin: 0;
             }
-
             #log>p.started {
-                color: red;
+                color: slateblue;
             }
-
             #log>p.finished {
                 color: green;
+                font-weight: bold;
+            }
+            #log>p.userCode {
+                color: orange;
             }
         </style>
     </head>
 
     <body>
         <h3>Sandboxing with Web Workers including messaging and async task execution</h3>
-
         <p>Remaining tasks: <span id="taskCounter">0</span></p>
-        <p>Debug log output:</p>
-
+        <p>Sandbox is running: <span id="activity">false</span></p>
+        <hr>
         <pre>
             <code id="log"></code>
         </pre>
