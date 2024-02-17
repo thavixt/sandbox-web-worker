@@ -1,12 +1,12 @@
 {
     "compilerOptions": {
-        "target": "ES2017",
+        "target": "esnext",
         "module": "ES6",
         "moduleResolution": "node",
         "sourceMap": true,
         "lib": [
             "dom",
-            "ES2017",
+            "ESNext",
         ],
         "noImplicitAny": true,
         "removeComments": true,

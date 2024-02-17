@@ -39,32 +39,29 @@ const FREEZE_API = ($scope) => {
     });
 };
 class Sandbox {
-    constructor({ name, code = '', api = { public: () => { }, handlers: {} }, onTaskCountChange = function () { }, autoTerminateAfterMs = -1, debug = null }) {
+    constructor({ name, code = '', api = { public: () => { }, handlers: {} }, onTaskCountChange = () => { }, onStart = () => { }, onTermination = () => { }, autoTerminateAfterMs = -1, logger = console.log }) {
         this.autoTerminateAfterMs = null;
         this.autoTerminationTimerId = null;
-        this.debug = null;
         this.markedForTermination = false;
         this.name = 'Sandbox' + getRandomId();
         this.runningTasks = new Map();
         this.thread = null;
         this.onTaskCountChange = null;
+        this.onStart = null;
+        this.onTermination = null;
         this.start = async () => {
             if (this.thread) {
                 console.warn(`${this.name} is already started and is running.`);
                 return;
             }
             this.thread = new Worker(this.blobURL);
-            if (this.debug) {
-                this.log(`SANDBOX CREATED.`);
-            }
+            this.onStart();
+            this.log(`SANDBOX STARTED`);
             this.thread.onmessage = (message) => {
-                const { taskId, action, payload = null } = message.data;
-                if (this.debug) {
-                    this.log(`TASK FINISHED: '${action}'`, message.data);
-                }
+                const { taskId, action, payload } = message.data;
+                this.log(`TASK FINISHED: '${action}'`, message.data);
                 if (this.handlers.hasOwnProperty(action)) {
                     if (!taskId) {
-                        this.log(`No taskId for current message. (method: ${action}) - probably called from sandbox code.`);
                         this.handlers[action](payload);
                         return;
                     }
@@ -81,10 +78,11 @@ class Sandbox {
                         this.onTaskCountChange(this.runningTasks.size);
                     }
                     this.handlers[action](payload);
-                    if (this.autoTerminateAfterMs >= 0 && this.thread) {
+                    if (this.autoTerminateAfterMs > 0 && this.thread) {
                         clearInterval(this.autoTerminationTimerId);
                         this.autoTerminationTimerId = setTimeout(() => {
                             if (this.thread) {
+                                this.log(`Terminating sandbox after ${this.autoTerminateAfterMs}ms of inactivity.`);
                                 this.terminate();
                             }
                         }, this.autoTerminateAfterMs);
@@ -124,9 +122,7 @@ class Sandbox {
                 promise: { resolve: resolveFn, reject: rejectFn },
                 callback,
             });
-            if (this.debug) {
-                this.log(`TASK STARTED: '${action}'`, { action, payload, taskId });
-            }
+            this.log(`TASK STARTED: '${action}'`, { action, payload, taskId });
             this.thread.postMessage({ action, payload, taskId });
             this.onTaskCountChange(this.runningTasks.size);
             return promise;
@@ -150,17 +146,16 @@ class Sandbox {
             this.thread = null;
             this.markedForTermination = false;
             if (!waitForTasksToFinish) {
-                this.log(`${this.name} terminated forcefully. ${taskCount} tasks were abandoned.`);
+                this.log(`${this.name} manually terminated. Number of tasks abandoned: ${taskCount}.`);
             }
-            if (this.debug) {
-                this.log(`SANDBOX TERMINATED.`);
-            }
+            this.log(`SANDBOX TERMINATED`);
+            this.onTermination();
             return;
         };
         if (typeof name === 'undefined') {
             console.error(`Property 'name' is undefined`);
         }
-        this.debug = debug;
+        this.logger = logger;
         this.autoTerminateAfterMs = autoTerminateAfterMs;
         this.name = `Sandbox#${name}`;
         this.blobURL = createBlobURL([
@@ -177,11 +172,11 @@ class Sandbox {
             }
         }, api.handlers || {});
         this.onTaskCountChange = onTaskCountChange;
+        this.onStart = onStart;
+        this.onTermination = onTermination;
     }
     log(message, task) {
-        if (this.debug) {
-            this.debug((new Date()).getTime(), this.name, message, task);
-        }
+        this.logger((new Date()).getTime(), this.name, message, task);
     }
 }
 function createBlobURL(blobParts) {

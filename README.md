@@ -226,13 +226,9 @@ const mySandbox({
 This will make the thread automatically terminate after 5 seconds of inactivity (no running tasks). Any API handler called will reset this timer, so running tasks won't be interrupted.
 
 
-## Example 2
-
-A (different) live example: https://thavixt.github.io/sandbox-web-worker/
-
 ## TODO
 
-- [x] example in README
+- [x] example in README / demo
 - [x] some documentation
 - [ ] fix source map url in example/sandbox.js
 - [x] fix debug log datetime format
@@ -240,4 +236,4 @@ A (different) live example: https://thavixt.github.io/sandbox-web-worker/
 - [ ] extend default Sandbox API with common useful methods
 - [ ] rename Sandbox scope ($) object ?
 - [ ] clean up code
-- [ ] testing ?
+- [ ] testing/code coverage...

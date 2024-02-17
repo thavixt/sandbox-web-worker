@@ -8,8 +8,10 @@ interface SandboxArguments {
         },
     },
     onTaskCountChange?: TaskCountChangeCallback,
+    onStart?: () => void,
+    onTermination?: () => void,
     autoTerminateAfterMs?: number,
-    debug?: LoggerFunction,
+    logger?: LoggerFunction,
 }
 export interface SandboxScope {
     main: () => Promise<void>;
@@ -19,8 +21,8 @@ export interface SandboxScope {
 interface Task<T = any> {
     _promiseObj: Promise<T>,
     promise: {
-        resolve: (result: T) => Promise<T>,
-        reject: (result: T) => Promise<T>,
+        resolve: (value: T) => Promise<void>,
+        reject: (reason: unknown) => Promise<void>,
     },
     callback?: (result: T) => void,
 }
@@ -37,7 +39,7 @@ export interface WorkerScope extends WindowOrWorkerGlobalScope {
     postMessage(message: TaskParams): void;
 }
 
-type LoggerFunction = (timestamp: number, sandboxName: string, message: string, task?: TaskParams) => void;
+type LoggerFunction = (timestamp: number, sandboxName: string, message: string, task?: TaskParams, result?: unknown) => void;
 
 export type SignalApiResponse = ({ action, payload, taskId }: TaskParams) => void;
 
@@ -88,7 +90,7 @@ class Sandbox {
     autoTerminateAfterMs: number | null = null;
     autoTerminationTimerId: number | null = null;
     blobURL: string;
-    debug: LoggerFunction | null = null;
+    logger?: LoggerFunction;
     handlers: {
         [key: string]: (...args: any[]) => any,
     }
@@ -97,20 +99,24 @@ class Sandbox {
     runningTasks = new Map<string, Task>();
     thread: Worker | null = null;
     onTaskCountChange: TaskCountChangeCallback | null = null;
+    onStart: () => void | null = null;
+    onTermination: () => void | null = null;
 
     constructor({
         name,
         code = '',
         api = { public: () => { }, handlers: {} },
-        onTaskCountChange = function () { },
+        onTaskCountChange = () => {},
+        onStart = () => {},
+        onTermination = () => {},
         autoTerminateAfterMs = -1,
-        debug = null
+        logger = console.log
     }: SandboxArguments) {
         if (typeof name === 'undefined') {
             console.error(`Property 'name' is undefined`);
         }
 
-        this.debug = debug;
+        this.logger = logger;
         this.autoTerminateAfterMs = autoTerminateAfterMs;
         this.name = `Sandbox#${name}`
         this.blobURL = createBlobURL([
@@ -127,6 +133,8 @@ class Sandbox {
             }
         }, api.handlers || {});
         this.onTaskCountChange = onTaskCountChange;
+        this.onStart = onStart;
+        this.onTermination = onTermination;
     }
 
     public start = async () => {
@@ -137,20 +145,17 @@ class Sandbox {
 
         this.thread = new Worker(this.blobURL);
 
-        if (this.debug) {
-            this.log(`SANDBOX CREATED.`);
-        }
+        this.onStart();
+        this.log(`SANDBOX STARTED`);
 
         this.thread.onmessage = (message) => {
-            const { taskId, action, payload = null } = message.data;
+            const { taskId, action, payload } = message.data;
 
-            if (this.debug) {
-                this.log(`TASK FINISHED: '${action}'`, message.data);
-            }
+            this.log(`TASK FINISHED: '${action}'`, message.data);
 
             if (this.handlers.hasOwnProperty(action)) {
                 if (!taskId) {
-                    this.log(`No taskId for current message. (method: ${action}) - probably called from sandbox code.`);
+                    // this.log(`No taskId for current message. (method: ${action}) - probably called from sandbox code.`);
                     this.handlers[action](payload);
                     return;
                 }
@@ -169,15 +174,15 @@ class Sandbox {
 
                 this.handlers[action](payload);
 
-                if (this.autoTerminateAfterMs >= 0 && this.thread) {
+                if (this.autoTerminateAfterMs > 0 && this.thread) {
                     clearInterval(this.autoTerminationTimerId);
                     this.autoTerminationTimerId = setTimeout(() => {
                         if (this.thread) {
+                            this.log(`Terminating sandbox after ${this.autoTerminateAfterMs}ms of inactivity.`);
                             this.terminate();
                         }
                     }, this.autoTerminateAfterMs);
                 }
-
             } else {
                 this.log(`Unrecognized action '${action} finished from ${this.name}`, message.data);
             }
@@ -211,7 +216,7 @@ class Sandbox {
 
         let resolveFn;
         let rejectFn;
-        const promise = new Promise((resolve, reject) => {
+        const promise = new Promise<unknown>((resolve, reject) => {
             resolveFn = resolve;
             rejectFn = reject;
         });
@@ -221,9 +226,7 @@ class Sandbox {
             callback,
         });
 
-        if (this.debug) {
-            this.log(`TASK STARTED: '${action}'`, { action, payload, taskId });
-        }
+        this.log(`TASK STARTED: '${action}'`, { action, payload, taskId });
 
         this.thread.postMessage({ action, payload, taskId });
         this.onTaskCountChange(this.runningTasks.size);
@@ -255,20 +258,17 @@ class Sandbox {
         this.markedForTermination = false;
 
         if (!waitForTasksToFinish) {
-            this.log(`${this.name} terminated forcefully. ${taskCount} tasks were abandoned.`);
+            this.log(`${this.name} manually terminated. Number of tasks abandoned: ${taskCount}.`);
         }
 
-        if (this.debug) {
-            this.log(`SANDBOX TERMINATED.`);
-        }
+        this.log(`SANDBOX TERMINATED`);
+        this.onTermination();
 
         return;
     }
 
     private log(message: string, task?: TaskParams) {
-        if (this.debug) {
-            this.debug((new Date()).getTime(), this.name, message, task);
-        }
+        this.logger((new Date()).getTime(), this.name, message, task);
     }
 }
 
